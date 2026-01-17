@@ -12,7 +12,7 @@ public class Main {
 
         var app = Javalin.create(config -> {
             config.staticFiles.add("/public");
-        }).start(Integer.parseInt(System.getenv().getOrDefault("PORT", "8082")));
+        }).start(Integer.parseInt(System.getenv().getOrDefault("PORT", "10000")));
 
         // --- LOGIN ---
         app.post("/api/login", ctx -> {
