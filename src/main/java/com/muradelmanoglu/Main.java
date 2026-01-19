@@ -8,10 +8,19 @@ import java.time.format.DateTimeFormatter;
 
 public class Main {
     public static void main(String[] args) {
+        // Proqram başlayan kimi bazanı hazırlayırıq
         DatabaseConfig.initializeDatabase();
 
         var app = Javalin.create(config -> {
             config.staticFiles.add("/public");
+
+            // CORS: Brauzerin Frontend-dən gələn sorğuları bloklamaması üçün
+            config.bundledPlugins.enableCors(cors -> {
+                cors.addRule(it -> {
+                    it.anyHost();
+                });
+            });
+
         }).start(Integer.parseInt(System.getenv().getOrDefault("PORT", "10000")));
 
         // --- LOGIN ---
@@ -31,7 +40,12 @@ public class Main {
                             "fullName", rs.getString("full_name"),
                             "role", rs.getString("role")
                     )));
-                } else { ctx.json(Map.of("success", false, "message", "Məlumatlar yanlışdır!")); }
+                } else {
+                    ctx.json(Map.of("success", false, "message", "Məlumatlar yanlışdır!"));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                ctx.status(500).json(Map.of("success", false, "message", "Server xətası!"));
             }
         });
 
@@ -46,34 +60,34 @@ public class Main {
                 ps.setString(4, "STUDENT");
                 ps.executeUpdate();
                 ctx.json(Map.of("success", true));
-            } catch (Exception e) { ctx.json(Map.of("success", false)); }
+            } catch (Exception e) {
+                e.printStackTrace();
+                ctx.json(Map.of("success", false));
+            }
         });
 
-        // --- ADMIN: USERS LIST & DELETE ---
+        // --- ADMIN: USERS LIST ---
         app.get("/api/users", ctx -> {
             List<Map<String, String>> users = new ArrayList<>();
-            try (Connection conn = DatabaseConfig.getConnection(); Statement s = conn.createStatement(); ResultSet rs = s.executeQuery("SELECT * FROM users")) {
+            try (Connection conn = DatabaseConfig.getConnection();
+                 Statement s = conn.createStatement();
+                 ResultSet rs = s.executeQuery("SELECT * FROM users")) {
                 while (rs.next()) {
                     users.add(Map.of("nickname", rs.getString("nickname"), "fullName", rs.getString("full_name"), "role", rs.getString("role")));
                 }
                 ctx.json(users);
-            }
-        });
-
-        app.post("/api/users/delete", ctx -> {
-            String nick = ctx.queryParam("nickname");
-            if ("orxan".equals(nick)) return;
-            try (Connection conn = DatabaseConfig.getConnection(); PreparedStatement ps = conn.prepareStatement("DELETE FROM users WHERE nickname = ?")) {
-                ps.setString(1, nick);
-                ps.executeUpdate();
-                ctx.json(Map.of("success", true));
+            } catch (Exception e) {
+                e.printStackTrace();
+                ctx.status(500);
             }
         });
 
         // --- TASKS: GET & ADD ---
         app.get("/api/tasks", ctx -> {
             List<Map<String, String>> tasks = new ArrayList<>();
-            try (Connection conn = DatabaseConfig.getConnection(); Statement s = conn.createStatement(); ResultSet rs = s.executeQuery("SELECT * FROM tasks ORDER BY updated_at DESC")) {
+            try (Connection conn = DatabaseConfig.getConnection();
+                 Statement s = conn.createStatement();
+                 ResultSet rs = s.executeQuery("SELECT * FROM tasks ORDER BY updated_at DESC")) {
                 while (rs.next()) {
                     Map<String, String> t = new HashMap<>();
                     t.put("id", rs.getString("id"));
@@ -87,13 +101,17 @@ public class Main {
                     tasks.add(t);
                 }
                 ctx.json(tasks);
+            } catch (Exception e) {
+                e.printStackTrace();
+                ctx.status(500);
             }
         });
 
         app.post("/api/tasks/add", ctx -> {
             Map<String, String> t = ctx.bodyAsClass(Map.class);
             String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
-            try (Connection conn = DatabaseConfig.getConnection(); PreparedStatement ps = conn.prepareStatement("INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
+            try (Connection conn = DatabaseConfig.getConnection();
+                 PreparedStatement ps = conn.prepareStatement("INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
                 ps.setString(1, UUID.randomUUID().toString());
                 ps.setString(2, t.get("ownerNickname"));
                 ps.setString(3, t.get("userFullName"));
@@ -104,25 +122,37 @@ public class Main {
                 ps.setString(8, time);
                 ps.executeUpdate();
                 ctx.status(201).json(Map.of("success", true));
-            } catch (Exception e) { e.printStackTrace(); ctx.status(500); }
+            } catch (Exception e) {
+                e.printStackTrace();
+                ctx.status(500);
+            }
         });
 
-        // --- UPDATE STATUS & DELETE TASK ---
+        // --- UPDATE STATUS ---
         app.post("/api/tasks/status", ctx -> {
             Map<String, String> b = ctx.bodyAsClass(Map.class);
-            try (Connection conn = DatabaseConfig.getConnection(); PreparedStatement ps = conn.prepareStatement("UPDATE tasks SET status = ? WHERE id = ?")) {
+            try (Connection conn = DatabaseConfig.getConnection();
+                 PreparedStatement ps = conn.prepareStatement("UPDATE tasks SET status = ? WHERE id = ?")) {
                 ps.setString(1, b.get("status"));
                 ps.setString(2, b.get("id"));
                 ps.executeUpdate();
                 ctx.json(Map.of("success", true));
+            } catch (Exception e) {
+                e.printStackTrace();
+                ctx.status(500);
             }
         });
 
+        // --- DELETE TASK ---
         app.post("/api/tasks/delete", ctx -> {
-            try (Connection conn = DatabaseConfig.getConnection(); PreparedStatement ps = conn.prepareStatement("DELETE FROM tasks WHERE id = ?")) {
+            try (Connection conn = DatabaseConfig.getConnection();
+                 PreparedStatement ps = conn.prepareStatement("DELETE FROM tasks WHERE id = ?")) {
                 ps.setString(1, ctx.queryParam("id"));
                 ps.executeUpdate();
                 ctx.json(Map.of("success", true));
+            } catch (Exception e) {
+                e.printStackTrace();
+                ctx.status(500);
             }
         });
     }
