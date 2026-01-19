@@ -56,7 +56,6 @@
         </nav>
 
         <main class="p-6 max-w-6xl mx-auto">
-
             <div v-if="user.role === 'STUDENT'" class="grid gap-8">
                 <section class="bg-[#161b22] p-6 rounded-2xl border border-gray-800 shadow-lg">
                     <h3 class="text-white font-bold mb-4 flex items-center gap-2">
@@ -84,9 +83,9 @@
                             <td class="p-4 text-sm text-gray-400">{{ t.lesson }}</td>
                             <td class="p-4 text-xs font-mono text-blue-400">{{ t.fileName }}</td>
                             <td class="p-4 text-center">
-                                        <span :class="getStatusClass(t.status)" class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">
-                                            {{ t.status }}
-                                        </span>
+                                <span :class="getStatusClass(t.status)" class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">
+                                    {{ t.status }}
+                                </span>
                             </td>
                         </tr>
                         </tbody>
@@ -120,7 +119,6 @@
                                 <div class="mt-1 flex items-center gap-2">
                                     <i class="fa-solid fa-link text-[10px] text-blue-500"></i>
                                     <a :href="t.fileName.startsWith('http') ? t.fileName : '#'"
-                                       @click="!t.fileName.startsWith('http') ? alert('Bu fayl lokal yaddaşdadır: ' + t.fileName) : null"
                                        target="_blank"
                                        class="text-[11px] font-mono text-blue-400 hover:underline cursor-pointer">
                                         {{ t.fileName }}
@@ -150,7 +148,6 @@
                                 </button>
                             </div>
                         </div>
-                        <div v-if="getStudentTasks(s.nickname).length === 0" class="p-6 text-center text-gray-600 italic text-sm">Bu tələbə hələ tapşırıq göndərməyib.</div>
                     </div>
                 </div>
             </div>
@@ -159,6 +156,9 @@
 </div>
 
 <script>
+    // Sənin real Backend URL-in bura əlavə olundu:
+    const API_URL = "https://taskcontroll.onrender.com";
+
     const { createApp } = Vue;
     createApp({
         data() {
@@ -179,32 +179,57 @@
         },
         methods: {
             async login() {
-                const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(this.loginForm) });
-                const data = await res.json();
-                if (data.success) { this.user = data.user; this.refreshData(); } else alert("Məlumatlar yanlışdır!");
+                try {
+                    const res = await fetch(`${API_URL}/api/login`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(this.loginForm)
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.user = data.user;
+                        this.refreshData();
+                    } else alert("Məlumatlar yanlışdır!");
+                } catch(e) { alert("Serverə qoşulmaq mümkün olmadı!"); }
             },
             async register() {
-                const res = await fetch('/api/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(this.regForm) });
+                const res = await fetch(`${API_URL}/api/register`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(this.regForm)
+                });
                 const data = await res.json();
-                if (data.success) { alert("Qeydiyyat tamamlandı!"); this.isLogin = true; } else alert(data.message);
+                if (data.success) {
+                    alert("Qeydiyyat tamamlandı!");
+                    this.isLogin = true;
+                } else alert("Xəta baş verdi!");
             },
             async refreshData() {
-                const [tRes, uRes] = await Promise.all([fetch('/api/tasks'), fetch('/api/users')]);
-                this.allTasks = await tRes.json();
-                this.allUsers = await uRes.json();
-                if (this.user.role === 'STUDENT') {
-                    this.myTasks = this.allTasks.filter(t => t.ownerNickname === this.user.nickname);
-                }
+                try {
+                    const [tRes, uRes] = await Promise.all([
+                        fetch(`${API_URL}/api/tasks`),
+                        fetch(`${API_URL}/api/users`)
+                    ]);
+                    this.allTasks = await tRes.json();
+                    this.allUsers = await uRes.json();
+                    if (this.user.role === 'STUDENT') {
+                        this.myTasks = this.allTasks.filter(t => t.ownerNickname === this.user.nickname);
+                    }
+                } catch(e) { console.error("Data yenilənmədi"); }
             },
             async addTask() {
                 if(!this.newTask.title || !this.newTask.lesson) return alert("Boş buraxmayın!");
                 const task = { ...this.newTask, ownerNickname: this.user.nickname, userFullName: this.user.fullName };
-                await fetch('/api/tasks/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(task) });
+                await fetch(`${API_URL}/api/tasks/add`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(task)
+                });
                 this.newTask = { title: '', lesson: '', fileName: '' };
                 this.refreshData();
             },
             async updateStatus(id, status) {
-                await fetch('/api/tasks/status', {
+                await fetch(`${API_URL}/api/tasks/status`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ id, status })
@@ -213,7 +238,7 @@
             },
             async deleteTask(id) {
                 if(confirm("Silinsin?")) {
-                    await fetch(`/api/tasks/delete?id=${id}`, { method: 'POST' });
+                    await fetch(`${API_URL}/api/tasks/delete?id=${id}`, { method: 'POST' });
                     this.refreshData();
                 }
             },
