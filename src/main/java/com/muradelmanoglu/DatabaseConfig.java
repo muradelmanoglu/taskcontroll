@@ -10,9 +10,8 @@ public class DatabaseConfig {
         if (dbUrl != null && !dbUrl.isEmpty()) {
             try {
                 URI dbUri = new URI(dbUrl);
-                String userInfo = dbUri.getUserInfo();
-                String username = userInfo.split(":")[0];
-                String password = userInfo.split(":")[1];
+                String username = dbUri.getUserInfo().split(":")[0];
+                String password = dbUri.getUserInfo().split(":")[1];
                 String dbFullUrl = "jdbc:postgresql://" + dbUri.getHost() + ":" + dbUri.getPort() + dbUri.getPath();
 
                 Properties props = new Properties();
@@ -23,22 +22,21 @@ public class DatabaseConfig {
 
                 Class.forName("org.postgresql.Driver");
                 return DriverManager.getConnection(dbFullUrl, props);
-            } catch (Exception e) { throw new SQLException("Bağlantı xətası: " + e.getMessage()); }
+            } catch (Exception e) { throw new SQLException(e.getMessage()); }
         }
         return DriverManager.getConnection("jdbc:postgresql://localhost:5432/codepolis_db", "postgres", "12345");
     }
 
     public static void initializeDatabase() {
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
-            // DİQQƏT: Əgər sütun xətası varsa, aşağıdakı iki sətri BİR DƏFƏLİK aktiv et (commentdən çıxar) ki, bazanı sıfırlasın:
-            // stmt.execute("DROP TABLE IF EXISTS tasks");
-            // stmt.execute("DROP TABLE IF EXISTS users CASCADE");
+            // MƏCBURİ SIFIRLAMA (Hər şeyi silirik ki, yeni sütunlar işləsin)
+            stmt.execute("DROP TABLE IF EXISTS tasks CASCADE");
+            stmt.execute("DROP TABLE IF EXISTS users CASCADE");
 
-            // 1. İstifadəçilər
-            stmt.execute("CREATE TABLE IF NOT EXISTS users (nickname TEXT PRIMARY KEY, full_name TEXT, password TEXT, role TEXT)");
+            // Yenidən yaratma
+            stmt.execute("CREATE TABLE users (nickname TEXT PRIMARY KEY, full_name TEXT, password TEXT, role TEXT)");
             
-            // 2. Tapşırıqlar (Bütün lazım olan sütunlarla)
-            stmt.execute("CREATE TABLE IF NOT EXISTS tasks (" +
+            stmt.execute("CREATE TABLE tasks (" +
                     "id TEXT PRIMARY KEY, " +
                     "owner_nickname TEXT REFERENCES users(nickname) ON DELETE CASCADE, " +
                     "user_fullname TEXT, " +
@@ -47,17 +45,14 @@ public class DatabaseConfig {
                     "status TEXT, " +
                     "github_link TEXT, " +
                     "file_name TEXT, " +
-                    "file_data TEXT, " +
+                    "file_data TEXT, " + 
                     "is_edited BOOLEAN DEFAULT FALSE, " +
                     "updated_at TEXT)");
 
-            // Admini yenidən yaradaq
-            stmt.execute("INSERT INTO users (nickname, full_name, password, role) VALUES ('orxan', 'Orxan Əlizadə', '12345', 'ADMIN') ON CONFLICT DO NOTHING");
+            // Admini mütləq bərpa edirik
+            stmt.execute("INSERT INTO users (nickname, full_name, password, role) VALUES ('orxan', 'Orxan Əlizadə', '12345', 'ADMIN')");
             
-            System.out.println("✅ Verilənlər bazası strukturu tam hazırdır.");
-        } catch (SQLException e) { 
-            System.err.println("❌ Database xətası: " + e.getMessage());
-            e.printStackTrace(); 
-        }
+            System.out.println("✅ Database tam sıfırlandı və yeni struktur quruldu!");
+        } catch (SQLException e) { e.printStackTrace(); }
     }
 }
